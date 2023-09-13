@@ -45,7 +45,7 @@ class SimulationDataset:
     and returns simulation dictionaries as expected by BayesFlow amortizers.
     """
 
-    def __init__(self, forward_dict, batch_size, buffer_size=1024):
+    def __init__(self, forward_dict, batch_size, buffer_size=1024, batch_on_cpu=False):
         """Creates a wrapper holding a ``tf.data.Dataset`` instance for
         offline training in an amortized estimation context.
 
@@ -61,10 +61,16 @@ class SimulationDataset:
             The batch size per model will be calculated as ``batch_size // num_models``
         buffer_size  : int, optional, default: 1024
             The buffer size for shuffling elements in a ``tf.data.Dataset``
+        batch_on_cpu  : bool, optional, default: False
+            A flag indicating whether the batching should be executed on cpu or not.
         """
 
         slices, keys_used, keys_none, n_sim = self._determine_slices(forward_dict)
-        self.data = tf.data.Dataset.from_tensor_slices(tuple(slices)).shuffle(buffer_size).batch(batch_size)
+        if batch_on_cpu:
+            with tf.device("/cpu:0"):
+                self.data = tf.data.Dataset.from_tensor_slices(tuple(slices)).shuffle(buffer_size).batch(batch_size)
+        else:
+            self.data = tf.data.Dataset.from_tensor_slices(tuple(slices)).shuffle(buffer_size).batch(batch_size)
         self.keys_used = keys_used
         self.keys_none = keys_none
         self.n_sim = n_sim
@@ -109,7 +115,7 @@ class MultiSimulationDataset:
     simulation dictionaries and returning these as expected by BayesFlow amortizers.
     """
 
-    def __init__(self, forward_dict, batch_size, buffer_size=1024):
+    def __init__(self, forward_dict, batch_size, buffer_size=1024, batch_on_cpu=False):
         """Creates a wrapper holding multiple ``tf.data.Dataset`` instances for
         offline training in an amortized model comparison context.
 
@@ -127,13 +133,15 @@ class MultiSimulationDataset:
             The batch size per model will be calculated as ``batch_size // num_models``
         buffer_size  : int, optional, default: 1024
             The buffer size for shuffling elements in a ``tf.data.Dataset``
+        **kwargs          : dict, optional, default {}
+            Additional keyword arguments passed to the `SimulationDataset` class.
         """
 
         self.model_indices = forward_dict[DEFAULT_KEYS["model_indices"]]
         self.num_models = len(self.model_indices)
         self.per_model_batch_size = batch_size // self.num_models
         self.datasets = [
-            SimulationDataset(out, self.per_model_batch_size, buffer_size)
+            SimulationDataset(out, self.per_model_batch_size, buffer_size, batch_on_cpu)
             for out in forward_dict[DEFAULT_KEYS["model_outputs"]]
         ]
         self.current_it = 0
