@@ -517,8 +517,7 @@ class Trainer:
            provided during initialization.
            If ``None`` (default), no validation set will be used.
         **kwargs          : dict, optional, default: {}
-            Additional keyword arguments passed to the `SimulationDataset` class (either directly or via
-            MultiSimulationDataset).
+            Additional keyword arguments.
 
         Other Parameters
         ----------------
@@ -549,9 +548,9 @@ class Trainer:
 
         # Inits
         if isinstance(self.amortizer, AmortizedModelComparison):
-            data_set = MultiSimulationDataset(simulations_dict, batch_size, **kwargs)
+            data_set = MultiSimulationDataset(simulations_dict, batch_size, **kwargs.pop("sim_dataset_args", {}))
         else:
-            data_set = SimulationDataset(simulations_dict, batch_size, **kwargs)
+            data_set = SimulationDataset(simulations_dict, batch_size, **kwargs.pop("sim_dataset_args", {}))
         self._setup_optimizer(optimizer, epochs, data_set.num_batches)
         self.loss_history.start_new_run()
         validation_sims = self._config_validation(validation_sims, **kwargs.pop("val_model_args", {}))
